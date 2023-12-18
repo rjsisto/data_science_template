@@ -1,0 +1,6 @@
+{
+	"project_name": "project_name",
+	"short_project_name": "name used for docker containers",
+	"project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '_') }}",
+	"project_description": "project_description"
+}
