@@ -1,7 +1,10 @@
 VENV = .venv
 PYTHON = $(VENV)/bin/python3 #this is only for unix
 PIP = $(VENV)/bin/pip #this is only for unix
-
+LOG_FILE=$(CURDIR)/docker/logs/prev_reqs.txt
+JUPYTER_LAB = jupyter-lab-{{cookiecutter.short_project_name}}
+R_STUDIO = rstudio-{{cookiecutter.short_project_name}}
+PYTHON_IMAGE = {{cookiecutter.short_project_name}}-python
 
 help:
 	@awk 'BEGIN {FS = ":.*##"; printf "\033[35m\033[0m"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$1, 5) } ' $(MAKEFILE_LIST)
@@ -9,43 +12,44 @@ help:
 ##@ Docker
 
 docker-build: ##builds the docker container
-	@docker build -t {{cookiecutter.short_project_name}}-python .
+	@docker build -t $(PYTHON_IMAGE) .
 
 docker-jup: ##creates the jupyter-lab instance
-	@docker run -d --name jupyter-lab-{{cookiecutter.short_project_name}} \
+	@docker run -d --name $(JUPYTER_LAB) \
 	-v $(CURDIR)/notebooks:/project/notebooks -v $(CURDIR)/src:/project/src \
-	-p 8888:8888 {{cookiecutter.short_project_name}}-python jupyter lab
-	@docker stop jupyter-lab-{{cookiecutter.short_project_name}}
+	-p 8888:8888 $(PYTHON_IMAGE) jupyter lab
+	@docker stop $(JUPYTER_LAB)
 
 docker-dash: ##creates the dash app instance
 	@docker run -w /project/data_app -it --name dash-app \
 	-v $(CURDIR)/data_app:/project/data_app -v $(CURDIR)/src:/project/src \
-	-p 8888:8888 {{cookiecutter.short_project_name}}-python python3 model_page.py
+	-p 8888:8888 $(PYTHON_IMAGE) python3 model_page.py
 	@docker stop dash-app
 
 #TODO try to automatically install all the neccessary r packages
 docker-rstudio: ##creates the rstudio docker instance
 	@docker build -f Dockerfile-rstudio -t new-rstudio .
-	@docker run -d --name rstudio-{{cookiecutter.short_project_name}} \
+	@docker run -d --name $(R_STUDIO) \
 	-v $(CURDIR)/notebooks:/home/project/notebooks -v $(CURDIR)/src:/home/project/src \
 	-e PASSWORD=password -p 8787:8787 new-rstudio
-	@docker stop rstudio-{{cookiecutter.short_project_name}}
+	@docker stop $(R_STUDIO)
 
 docker-clean: ##removes all instances of the docker containers
-	@docker rm dash-app jupyter-lab-{{cookiecutter.short_project_name}} rstudio-{{cookiecutter.short_project_name}}
+	@bash docker/get_reqs.sh $(LOG_FILE) $(JUPYTER_LAB) $(R_STUDIO)
+	@docker rm dash-app $(JUPYTER_LAB) $(R_STUDIO)
 
 
 ##@ Jupyter Lab
 launch-jup: ##launches the jupyter lab instance
-	@docker start jupyter-lab-{{cookiecutter.short_project_name}}
+	@docker start $(JUPYTER_LAB)
 	@echo "Go to http://localhost:8888 to access the jupyter notebook"
 
 stop-jup: ##stops the jupyter lab instance
-	@docker stop jupyter-lab-{{cookiecutter.short_project_name}}
+	@docker stop $(JUPYTER_LAB)
 	@echo "The jupyter lab instance has been stopped"
 
 bash-jup: ##runs bash inside the jupyter docker container
-	@docker exec -it jupyter-lab-{{cookiecutter.short_project_name}} bash
+	@docker exec -it $(JUPYTER_LAB) bash
 
 ##@ Dash App
 #TODO probably dont need launch and stop dash commands
@@ -63,15 +67,15 @@ bash-dash: ##runs bash inside the dash-app docker container
 
 ##@ RStudio
 launch-rstudio: ##launches RStudio
-	@docker start rstudio-{{cookiecutter.short_project_name}}
+	@docker start $(R_STUDIO)
 	@echo "Go to http://localhost:8787"
 	@echo "Use 'rstudio' as a username and 'password' as the password"
 
 stop-rstudio: ##stops RStudio
-	@docker stop rstudio-{{cookiecutter.short_project_name}}
+	@docker stop $(R_STUDIO)
 
 bash-rstudio: ##runs bash within the rstudio container
-	@docker exec -it rstudio-{{cookiecutter.short_project_name}} bash
+	@docker exec -it $(R_STUDIO) bash
 
 ##@ Local Python Environment
 create-env: ##creates the local python environment
